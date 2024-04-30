@@ -1,0 +1,141 @@
+diff --git a/start-vswitch.sh b/start-vswitch.sh
+index 4c70fec..075edbf 100755
+--- a/start-vswitch.sh
++++ b/start-vswitch.sh
+@@ -878,7 +878,7 @@ ovs) #switch configuration
+ 	log "starting ovs-vswitchd"
+ 	case $dataplane in
+ 	"dpdk")
+-		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17"; then
++		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3"; then
+ 			dpdk_opts=""
+ 			#
+ 			# Specify OVS should support DPDK ports
+@@ -909,11 +909,13 @@ ovs) #switch configuration
+ 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask="`get_cpumask $local_nodes_non_iso_cpus_list`"
+ 				;;
+ 			preferred)
++				log "NUMA setting is perferred"
+ 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-socket-mem="$all_socket_mem_opt"
+ 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask=$mask_all_nodes_non_iso_cpus_list
+ 				;;
+ 			esac
+ 		else
++			log "Starting with --dpdk option"
+ 			dpdk_opts="--dpdk -n 4 --socket-mem $local_socket_mem_opt --"
+ 		fi
+ 
+@@ -1012,7 +1014,7 @@ ovs) #switch configuration
+ 	$ovs_bin/ovs-vsctl --no-wait init
+ 
+ 	if [ "$dataplane" == "dpdk" ]; then
+-		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17"; then
++		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3"; then
+ 			pci_devs=`get_devs_locs $devs`
+ 
+ 			ovs_dpdk_interface_0_name="dpdk-0"
+@@ -1058,7 +1060,7 @@ ovs) #switch configuration
+ 				log "vhost_port: $vhost_port"
+ 				vhost_ports="$vhost_ports,$vhost_port"
+ 
+-		        if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17"; then
++		        if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3"; then
+ 					phys_port_name="dpdk-${i}"
+ 					phys_port_args="options:dpdk-devargs=${pci_dev}"
+ 				else
+@@ -1133,12 +1135,15 @@ ovs) #switch configuration
+ 		echo "devs = $devs"
+ 		echo "vhost_ports = $vhost_ports"
+ 		echo "queues = $queues"
+-		echo "pmdcpus = $pmdcpus"
++		log "BILL1 pmdcpus = $pmdcpus"
+ 
+ 		pmdcpus=`get_pmd_cpus "$devs,$vhost_ports" $queues "ovs-pmd"`
+ 
++		log "BILL2 pmdcpus = $pmdcpus"
+ 		if [ -z "$pmdcpus" ]; then
+ 			exit_error "Could not allocate PMD threads.  Do you have enough isolated cpus in the right NUMA nodes?" ""
++		else
++		        log "BILL2.5 pmdcpus = $pmdcpus"
+ 		fi
+ 
+ 		pmd_cpu_mask=`get_cpumask $pmdcpus`
+@@ -1171,16 +1176,13 @@ ovs) #switch configuration
+ 				echo "this_cpu_thread = $this_cpu_thread"
+ 				log "$ovs_bin/ovs-vsctl set Interface $iface other_config:pmd-rxq-affinity=0:$this_cpu_thread"
+ 				if [ ! -z "$iface" ]; then
+-					echo "BILL"
+ 					$ovs_bin/ovs-vsctl set Interface $iface other_config:pmd-rxq-affinity=0:$this_cpu_thread
+-				else
+-					echo "BILL1"
+ 				fi
+ 			done
+ 		done
+ 		fi
+ 
+-		log "PMD cpumask command: ovs-vsctl set Open_vSwitch . other_config:pmd-cpu-mask=$pmd_cpu_mask"
++		#log "PMD cpumask command: ovs-vsctl set Open_vSwitch . other_config:pmd-cpu-mask=$pmd_cpu_mask"
+ 		log "PMD thread assignments:"
+ 		$ovs_bin/ovs-appctl dpif-netdev/pmd-rxq-show
+ 	
+diff --git a/utils/cpu_parsing.sh b/utils/cpu_parsing.sh
+index 1af8603..94b143b 100644
+--- a/utils/cpu_parsing.sh
++++ b/utils/cpu_parsing.sh
+@@ -18,7 +18,7 @@ function init_cpu_usage_file() {
+ 	local iso_cpus
+ 	/bin/rm -f $cpu_usage_file
+ 	touch $cpu_usage_file
+-	iso_cpus=$(cat /sys/devices/system/cpu/isolated)
++	iso_cpus=$(cat /sys/devices/system/cpu/nohz_full)
+ 	if [ -n "${iso_cpus}" ]; then
+ 		iso_cpu_list=$(convert_number_range "${iso_cpus}")
+ 	else
+@@ -47,6 +47,7 @@ function get_iso_cpus() {
+ 	local list=""
+ 	for cpu in `grep -E "[0-9]+:$" $cpu_usage_file | awk -F: '{print $1}'`; do
+ 		list="$list,$cpu"
++		echo "BILL10 list = $list" >> mydebug.txt
+ 	done
+ 	list=`echo $list | sed -e 's/^,//'`
+ 	echo "$list"
+@@ -235,7 +236,7 @@ function remove_sibling_cpus() {
+ # pmdcpus=`get_pmd_cpus "$devs,$vhost_ports" $queues "ovs-pmd"`
+ function get_pmd_cpus() {
+ 
+-	local devs=$1
++	local devs1=$1
+ 	local nr_queues=$2
+ 	local cpu_usage=$3
+ 	local pmd_cpu_list=""
+@@ -250,7 +251,7 @@ function get_pmd_cpus() {
+ 
+ 	# for each device, get N cpus, where N = number of queues
+ 	local this_dev
+-	for this_dev in `echo $devs | sed -e 's/,/ /g'`; do
++	for this_dev in `echo $devs1 | sed -e 's/,/ /g'`; do
+ 		if echo $this_dev | grep -q vhost; then
+ 			# the file name for vhostuser ends with a number matching the NUMA node
+ 			node_id="${this_dev: -1}"
+@@ -262,9 +263,13 @@ function get_pmd_cpus() {
+ 			fi
+ 		fi
+ 		cpus_list=`node_cpus_list "$node_id"`
++
++		echo "BILL6 cpus_list = $cpus_list" > mydebug.txt
+ 		iso_cpus_list=`get_iso_cpus`
++		echo "BILL7 iso_cpus_list = $iso_cpus_list" >> mydebug.txt
+ 
+ 		node_iso_cpus_list=`intersect_cpus "$cpus_list" "$iso_cpus_list"`
++		echo "BILL8 node_iso_cpus_list = $node_iso_cpus_list" >> mydebug.txt
+ 
+ 		if [ "$use_ht" == "n" ]; then
+ 			node_iso_cpus_list=`remove_sibling_cpus $node_iso_cpus_list`
+@@ -279,6 +284,7 @@ function get_pmd_cpus() {
+ 			if [ "$use_ht" == "y" -a "$prev_cpu" != "" ]; then
+ 				# search for sibling cpu-threads before picking next avail cpu
+ 				cpu_siblings_range=`cat /sys/devices/system/cpu/cpu$prev_cpu/topology/thread_siblings_list`
++				echo "BILL9 cpu_siblings_range = $cpu_siblings_range" >> mydebug.txt
+ 				cpu_siblings_list=`convert_number_range $cpu_siblings_range`
+ 				cpu_siblings_avail_list=`sub_from_list  $cpu_siblings_list $pmd_cpus_list`
+ 				if [ "$cpu_siblings_avail_list" != "" ]; then

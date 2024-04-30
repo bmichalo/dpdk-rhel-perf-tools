@@ -878,7 +878,7 @@ ovs) #switch configuration
 	log "starting ovs-vswitchd"
 	case $dataplane in
 	"dpdk")
-		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17"; then
+		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3"; then
 			dpdk_opts=""
 			#
 			# Specify OVS should support DPDK ports
@@ -909,11 +909,13 @@ ovs) #switch configuration
 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask="`get_cpumask $local_nodes_non_iso_cpus_list`"
 				;;
 			preferred)
+				log "NUMA setting is perferred"
 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-socket-mem="$all_socket_mem_opt"
 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask=$mask_all_nodes_non_iso_cpus_list
 				;;
 			esac
 		else
+			log "Starting with --dpdk option"
 			dpdk_opts="--dpdk -n 4 --socket-mem $local_socket_mem_opt --"
 		fi
 
@@ -1012,7 +1014,7 @@ ovs) #switch configuration
 	$ovs_bin/ovs-vsctl --no-wait init
 
 	if [ "$dataplane" == "dpdk" ]; then
-		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17"; then
+		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3"; then
 			pci_devs=`get_devs_locs $devs`
 
 			ovs_dpdk_interface_0_name="dpdk-0"
@@ -1058,7 +1060,7 @@ ovs) #switch configuration
 				log "vhost_port: $vhost_port"
 				vhost_ports="$vhost_ports,$vhost_port"
 
-		        if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17"; then
+		        if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3"; then
 					phys_port_name="dpdk-${i}"
 					phys_port_args="options:dpdk-devargs=${pci_dev}"
 				else
@@ -1133,12 +1135,15 @@ ovs) #switch configuration
 		echo "devs = $devs"
 		echo "vhost_ports = $vhost_ports"
 		echo "queues = $queues"
-		echo "pmdcpus = $pmdcpus"
+		log "BILL1 pmdcpus = $pmdcpus"
 
 		pmdcpus=`get_pmd_cpus "$devs,$vhost_ports" $queues "ovs-pmd"`
 
+		log "BILL2 pmdcpus = $pmdcpus"
 		if [ -z "$pmdcpus" ]; then
 			exit_error "Could not allocate PMD threads.  Do you have enough isolated cpus in the right NUMA nodes?" ""
+		else
+		        log "BILL2.5 pmdcpus = $pmdcpus"
 		fi
 
 		pmd_cpu_mask=`get_cpumask $pmdcpus`
@@ -1171,16 +1176,13 @@ ovs) #switch configuration
 				echo "this_cpu_thread = $this_cpu_thread"
 				log "$ovs_bin/ovs-vsctl set Interface $iface other_config:pmd-rxq-affinity=0:$this_cpu_thread"
 				if [ ! -z "$iface" ]; then
-					echo "BILL"
 					$ovs_bin/ovs-vsctl set Interface $iface other_config:pmd-rxq-affinity=0:$this_cpu_thread
-				else
-					echo "BILL1"
 				fi
 			done
 		done
 		fi
 
-		log "PMD cpumask command: ovs-vsctl set Open_vSwitch . other_config:pmd-cpu-mask=$pmd_cpu_mask"
+		#log "PMD cpumask command: ovs-vsctl set Open_vSwitch . other_config:pmd-cpu-mask=$pmd_cpu_mask"
 		log "PMD thread assignments:"
 		$ovs_bin/ovs-appctl dpif-netdev/pmd-rxq-show
 	

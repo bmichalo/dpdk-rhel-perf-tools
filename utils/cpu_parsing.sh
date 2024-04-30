@@ -18,7 +18,7 @@ function init_cpu_usage_file() {
 	local iso_cpus
 	/bin/rm -f $cpu_usage_file
 	touch $cpu_usage_file
-	iso_cpus=$(cat /sys/devices/system/cpu/isolated)
+	iso_cpus=$(cat /sys/devices/system/cpu/nohz_full)
 	if [ -n "${iso_cpus}" ]; then
 		iso_cpu_list=$(convert_number_range "${iso_cpus}")
 	else
@@ -47,6 +47,7 @@ function get_iso_cpus() {
 	local list=""
 	for cpu in `grep -E "[0-9]+:$" $cpu_usage_file | awk -F: '{print $1}'`; do
 		list="$list,$cpu"
+		echo "BILL10 list = $list" >> mydebug.txt
 	done
 	list=`echo $list | sed -e 's/^,//'`
 	echo "$list"
@@ -235,7 +236,7 @@ function remove_sibling_cpus() {
 # pmdcpus=`get_pmd_cpus "$devs,$vhost_ports" $queues "ovs-pmd"`
 function get_pmd_cpus() {
 
-	local devs=$1
+	local devs1=$1
 	local nr_queues=$2
 	local cpu_usage=$3
 	local pmd_cpu_list=""
@@ -250,7 +251,7 @@ function get_pmd_cpus() {
 
 	# for each device, get N cpus, where N = number of queues
 	local this_dev
-	for this_dev in `echo $devs | sed -e 's/,/ /g'`; do
+	for this_dev in `echo $devs1 | sed -e 's/,/ /g'`; do
 		if echo $this_dev | grep -q vhost; then
 			# the file name for vhostuser ends with a number matching the NUMA node
 			node_id="${this_dev: -1}"
@@ -262,9 +263,13 @@ function get_pmd_cpus() {
 			fi
 		fi
 		cpus_list=`node_cpus_list "$node_id"`
+
+		echo "BILL6 cpus_list = $cpus_list" > mydebug.txt
 		iso_cpus_list=`get_iso_cpus`
+		echo "BILL7 iso_cpus_list = $iso_cpus_list" >> mydebug.txt
 
 		node_iso_cpus_list=`intersect_cpus "$cpus_list" "$iso_cpus_list"`
+		echo "BILL8 node_iso_cpus_list = $node_iso_cpus_list" >> mydebug.txt
 
 		if [ "$use_ht" == "n" ]; then
 			node_iso_cpus_list=`remove_sibling_cpus $node_iso_cpus_list`
@@ -279,6 +284,7 @@ function get_pmd_cpus() {
 			if [ "$use_ht" == "y" -a "$prev_cpu" != "" ]; then
 				# search for sibling cpu-threads before picking next avail cpu
 				cpu_siblings_range=`cat /sys/devices/system/cpu/cpu$prev_cpu/topology/thread_siblings_list`
+				echo "BILL9 cpu_siblings_range = $cpu_siblings_range" >> mydebug.txt
 				cpu_siblings_list=`convert_number_range $cpu_siblings_range`
 				cpu_siblings_avail_list=`sub_from_list  $cpu_siblings_list $pmd_cpus_list`
 				if [ "$cpu_siblings_avail_list" != "" ]; then

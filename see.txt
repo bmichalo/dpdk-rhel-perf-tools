@@ -1,0 +1,131 @@
+start-vswitch: LINENO: 397 opts: [ --devices '0000:a1:00.0,0000:a1:00.1' --dataplane 'dpdk' --dpdk-nic-kmod 'mlx5_core' --switch 'ovs' --topology 'pp' --use-ht 'y' --numa-mode 'preferred' --switch-mode 'l2-bridge' --]
+start-vswitch: LINENO: 399 Processing options:
+start-vswitch: LINENO: 415 devs: [0000:a1:00.0,0000:a1:00.1]
+start-vswitch: LINENO: 455 dataplane: [dpdk]
+start-vswitch: LINENO: 525 dpdk_nic_kmod: [mlx5_core]
+start-vswitch: LINENO: 487 switch: [ovs]
+start-vswitch: LINENO: 447 topology: [pp]
+start-vswitch: LINENO: 439 use_ht: [y]
+start-vswitch: LINENO: 517 numa_mode: [preferred]
+start-vswitch: LINENO: 498 switch_mode: [l2-bridge]
+start-vswitch: LINENO: 570 Validating the switch-mode l2-bridge given the switch is ovs...
+start-vswitch: LINENO: 591 switch-mode l2-bridge is valid
+start-vswitch: LINENO: 594 Determining if proper software tools are installed...
+start-vswitch: LINENO: 614 Using OVS from RPM
+start-vswitch: LINENO: 630 devs = 0000:a1:00.0,0000:a1:00.1
+start-vswitch: LINENO: 637 Using PCI device: a1:00.0 Ethernet controller: Mellanox Technologies MT28908 Family [ConnectX-6]
+start-vswitch: LINENO: 637 Using PCI device: a1:00.1 Ethernet controller: Mellanox Technologies MT28908 Family [ConnectX-6]
+start-vswitch: LINENO: 646 kernel mod: mlx5_core
+start-vswitch: LINENO: 649 Checking for an existing process using 0000:a1:00.0,0000:a1:00.1
+start-vswitch: LINENO: 661 stopping ovs
+start-vswitch: LINENO: 665 stopping testpmd
+start-vswitch: LINENO: 676 Initializing devices to use DPDK as the dataplane
+start-vswitch: LINENO: 692 device 0000:a1:00.0 node is 6
+start-vswitch: LINENO: 692 device 0000:a1:00.1 node is 6
+start-vswitch: LINENO: 695 local_socket_mem: 0
+start-vswitch: LINENO: 699 mem: 0
+start-vswitch: LINENO: 699 mem: 0
+start-vswitch: LINENO: 699 mem: 0
+start-vswitch: LINENO: 699 mem: 0
+start-vswitch: LINENO: 699 mem: 0
+start-vswitch: LINENO: 699 mem: 0
+start-vswitch: LINENO: 699 mem: 1024
+start-vswitch: LINENO: 699 mem: 0
+start-vswitch: LINENO: 714 local_numa_nodes: 6
+start-vswitch: LINENO: 716 local_socket_mem_opt: 0,0,0,0,0,0,1024,0
+start-vswitch: LINENO: 718 all_socket_mem_opt: 1024,1024,1024,1024,1024,1024,1024,1024
+start-vswitch: LINENO: 723 isol cpus_list is 
+start-vswitch: LINENO: 724 all-nodes-non-isolated cpus list is 
+start-vswitch: LINENO: 729 not loading vfio (already loaded)
+start-vswitch: LINENO: 732 loaded vfio-pci module
+start-vswitch: LINENO: 739 DPDK devs: 0000:a1:00.0,0000:a1:00.1
+start-vswitch: LINENO: 744 unbinding module from 0000:a1:00.0
+start-vswitch: LINENO: 746 binding mlx5_core to 0000:a1:00.0
+start-vswitch: LINENO: 751 taking down link on ens2f0np0
+start-vswitch: LINENO: 762 unbinding mlx5_core from 0000:a1:00.0
+start-vswitch: LINENO: 764 binding mlx5_core to 0000:a1:00.0
+start-vswitch: LINENO: 744 unbinding module from 0000:a1:00.1
+start-vswitch: LINENO: 746 binding mlx5_core to 0000:a1:00.1
+start-vswitch: LINENO: 751 taking down link on ens2f1np1
+start-vswitch: LINENO: 762 unbinding mlx5_core from 0000:a1:00.1
+start-vswitch: LINENO: 764 binding mlx5_core to 0000:a1:00.1
+start-vswitch: LINENO: 797 configuring the vswitch: ovs
+start-vswitch: LINENO: 864 starting ovs (ovs_ver=3.2.3)
+start-vswitch: LINENO: 867 Initializing the OVS configuration database at /etc/openvswitch/conf.db using 'ovsdb-tool create'...
+start-vswitch: LINENO: 869 Starting the OVS configuration database process ovsdb-server and connecting to Unix socket /var/run/openvswitch/db.sock...
+start-vswitch: LINENO: 875 Now intialize the OVS database using 'ovs-vsctl --no-wait init' ...
+start-vswitch: LINENO: 878 starting ovs-vswitchd
+start-vswitch: LINENO: 912 NUMA setting is perferred
+start-vswitch: LINENO: 1000 Using preferred NUMA configuration mode when starting OVS:
+start-vswitch: LINENO: 1013 waiting for ovs to init
+start-vswitch: LINENO: 1024 ovs_dpdk_interface_0_args[options:dpdk-devargs=0000:a1:00.0]
+start-vswitch: LINENO: 1030 ovs_dpdk_interface_1_args[options:dpdk-devargs=0000:a1:00.1]
+start-vswitch: LINENO: 1038 configuring ovs with network topology: pp
+start-vswitch: LINENO: 1108 using 1 queue(s) per port
+start-vswitch: LINENO: 1119 setting PCI descriptors/queue with 2048
+start-vswitch: LINENO: 1129 using a total of 2 PMD threads
+devs = 0000:a1:00.0,0000:a1:00.1
+vhost_ports = 
+queues = 1
+pmdcpus = 
+this_cpu = BILL 0000:a1:00.0
+cpu_siblings_range = 
+cpu_siblings_list = 
+start-vswitch: LINENO: 1185 PMD cpumask command: ovs-vsctl set Open_vSwitch . other_config:pmd-cpu-mask=80000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+00000000000000000000000000000000000000000000000000000000000000000000\
+0000000000000000000000000000000000000000000000000000
+start-vswitch: LINENO: 1186 PMD thread assignments:
+Displaying last 60 seconds pmd usage %
+pmd thread numa_id 2 core_id 21:
+  isolated : false
+pmd thread numa_id 0 core_id 68:
+  isolated : false
+pmd thread numa_id 1 core_id 78:
+  isolated : false
+pmd thread numa_id 3 core_id 88:
+  isolated : false
+pmd thread numa_id 4 core_id 96:
+  isolated : false
+pmd thread numa_id 5 core_id 106:
+  isolated : false
+pmd thread numa_id 6 core_id 116:
+  isolated : false
+  port: dpdk-0            queue-id:  0 (enabled)   pmd usage: NOT AVAIL
+  port: dpdk-1            queue-id:  0 (enabled)   pmd usage: NOT AVAIL
+  overhead: NOT AVAIL
+pmd thread numa_id 7 core_id 124:
+  isolated : false
