@@ -71,7 +71,8 @@ $ovs_bin/ovs-vsctl add-br ovsbr0 -- set bridge ovsbr0 datapath_type=netdev
 $ovs_bin/ovs-vsctl add-port ovsbr0 ${ovs_dpdk_interface_0_name} -- set Interface ${ovs_dpdk_interface_0_name} type=dpdk ${ovs_dpdk_interface_0_args}
 $ovs_bin/ovs-vsctl add-port ovsbr0 ${ovs_dpdk_interface_1_name} -- set Interface ${ovs_dpdk_interface_1_name} type=dpdk ${ovs_dpdk_interface_1_args}
 $ovs_bin/ovs-ofctl del-flows ovsbr0
-set_ovs_bridge_mode ovsbr0 ${switch_mode}
+$ovs_bin/ovs-ofctl del-flows ovsbr0 
+$ovs_bin/ovs-ofctl add-flow ovsbr0 action=NORMAL
 ovs_ports=2
 
 
