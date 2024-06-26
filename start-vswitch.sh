@@ -100,6 +100,16 @@ switch_mode="default"
 numa_mode="strict" 
 
 
+#
+# vm_numa_node:
+#
+#	'vm_numa_node' is for DPDK vswitches only.
+#
+#       A number representing which NUMA node a VM is defined
+#
+vm_numa_node="" 
+
+
 
 #
 # ovs_build:
@@ -350,7 +360,7 @@ function get_sd_netdev_name() {
 }
 
 # Process options and arguments
-opts=$(getopt -q -o i:c:t:r:m:p:M:S:C:o --longoptions "no-kill,vhost-affinity:,numa-mode:,desc-override:,vhost_devices:,pci-devices:,devices:,nr-queues:,use-ht:,overlay-network:,topology:,dataplane:,switch:,switch-mode:,testpmd-path:,dpdk-nic-kmod:,prefix:,pci-desc-override:,print-config" -n "getopt.sh" -- "$@")
+opts=$(getopt -q -o i:c:t:r:m:p:M:S:C:o --longoptions "no-kill,vhost-affinity:,numa-mode:,vm-numa-node:,desc-override:,vhost_devices:,pci-devices:,devices:,nr-queues:,use-ht:,overlay-network:,topology:,dataplane:,switch:,switch-mode:,testpmd-path:,dpdk-nic-kmod:,prefix:,pci-desc-override:,print-config" -n "getopt.sh" -- "$@")
 if [ $? -ne 0 ]; then
 	printf -- "$*\n"
 	printf "\n"
@@ -391,6 +401,7 @@ if [ $? -ne 0 ]; then
 	printf -- "\t\t                                                   the local NUMA node, but VMs are present on another NUMA node,\n"
 	printf -- "\t\t                                                   and so the PMD threads for those virt devices are also on\n"
 	printf -- "\t\t                                                   another NUMA node.\n"
+        printf -- "\t\t--vm-numa-node ........................ Number representing which NUMA node the VM exists.  To be used with 'numa-mode=cross'\n"
 	exit_error "" ""
 fi
 pci_descriptor_override=""
@@ -517,6 +528,14 @@ while true; do
 			log "numa_mode: [$numa_mode]"
 		fi
 		;;
+		--vm-numa-node)
+		shift
+		if [ -n "$1" ]; then
+			vm_numa_node="$1"
+			shift
+			log "vm_numa_node: [$vm_numa_node]"
+		fi
+		;;
 		--dpdk-nic-kmod)
 		shift
 		if [ -n "$1" ]; then
@@ -541,6 +560,7 @@ while true; do
 		echo "switch = $switch"
 		echo "switch_mode = $switch_mode"
 		echo "numa_mode = $numa_mode"
+		echo "vm_numa_node = $vm_numa_node"
 		echo "ovs_build = $ovs_build"
 		echo "dpdk_nic_kmod = $dpdk_nic_kmod"
 		echo "dataplane = $dataplane"
@@ -589,6 +609,10 @@ case "${switch}" in
 		;;
 esac
 log "switch-mode $switch_mode is valid"
+
+num_system_cpus=`getconf _NPROCESSORS_ONLN`
+
+log "BILL - num_system_cpus = $num_system_cpus"
 
 # check for software dependencies.  Just make sure everything possibly needed is installed.
 log "Determining if proper software tools are installed..."
@@ -694,14 +718,14 @@ case $dataplane in
 	done
 	log "local_socket_mem: ${local_socket_mem[@]}"
 	local_socket_mem_opt=""
-    all_socket_mem_opt=""
+        all_socket_mem_opt=""
 	for mem in "${local_socket_mem[@]}"; do
 		log "mem: $mem"
 		local_socket_mem_opt="$local_socket_mem_opt,$mem"
 		all_socket_mem_opt="$all_socket_mem_opt,1024"
 	done
-    local_numa_nodes=""
-    local_nodes_cpus_list=""
+        local_numa_nodes=""
+        local_nodes_cpus_list=""
 	for node in "${!local_socket_mem[@]}"; do
 		if [ "${local_socket_mem[$node]}" == "1024" ]; then
 			local_numa_nodes="$local_numa_nodes,$node"
@@ -878,7 +902,7 @@ ovs) #switch configuration
 	log "starting ovs-vswitchd"
 	case $dataplane in
 	"dpdk")
-		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3"; then
+		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3"; then
 			dpdk_opts=""
 			#
 			# Specify OVS should support DPDK ports
@@ -900,16 +924,25 @@ ovs) #switch configuration
 			# true (OVS 2.7) or OVS-DPDK is started (OVS 2.6)
 			#
 
-            mask_all_nodes_non_iso_cpus_list=`get_cpumask $local_nodes_non_iso_cpus_list` 
-            #log "mask_all_nodes_non_iso_cpus_list = $mask_all_nodes_non_iso_cpus_list"
+			echo "local_nodes_non_iso_cpus_list = $local_nodes_non_iso_cpus_list" > seemask.txt
+                        mask_all_nodes_non_iso_cpus_list=`get_cpumask $local_nodes_non_iso_cpus_list` 
+			echo "mask_all_nodes_non_iso_cpus_list = $mask_all_nodes_non_iso_cpus_list" >> seemask.txt
+                        #log "mask_all_nodes_non_iso_cpus_list = $mask_all_nodes_non_iso_cpus_list"
 			case $numa_mode in
 			strict)
+				log "NUMA setting is strict"
 				log "OVS setting other_config:dpdk-socket-mem = $local_socket_mem_opt"
 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-socket-mem="$local_socket_mem_opt"
-				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask="`get_cpumask $local_nodes_non_iso_cpus_list`"
+				#$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask="`get_cpumask $local_nodes_non_iso_cpus_list`"
 				;;
 			preferred)
 				log "NUMA setting is perferred"
+				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-socket-mem="$all_socket_mem_opt"
+				#$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask=$mask_all_nodes_non_iso_cpus_list
+				#$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-extra="--lcores 0@32,1@160,2@33,4@161"
+				;;
+			cross)
+				log "NUMA setting is cross"
 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-socket-mem="$all_socket_mem_opt"
 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask=$mask_all_nodes_non_iso_cpus_list
 				;;
@@ -998,6 +1031,10 @@ ovs) #switch configuration
 			;;
 		preferred)
 			log "Using preferred NUMA configuration mode when starting OVS:"
+			#log "BILL - dpdk_opts = $dpdk_opts"
+			#log "BILL - DB_SOCK = $DB_SOCK"
+			#sleep 5
+			#exit
 			sudo su -g qemu -c "umask 002; $ovs_sbin/ovs-vswitchd $dpdk_opts unix:$DB_SOCK --pidfile --log-file=/var/log/openvswitch/ovs-vswitchd.log --detach"
 			;;
 		esac
@@ -1014,7 +1051,7 @@ ovs) #switch configuration
 	$ovs_bin/ovs-vsctl --no-wait init
 
 	if [ "$dataplane" == "dpdk" ]; then
-		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3"; then
+		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3"; then
 			pci_devs=`get_devs_locs $devs`
 
 			ovs_dpdk_interface_0_name="dpdk-0"
@@ -1060,7 +1097,7 @@ ovs) #switch configuration
 				log "vhost_port: $vhost_port"
 				vhost_ports="$vhost_ports,$vhost_port"
 
-		        if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3"; then
+		        if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3"; then
 					phys_port_name="dpdk-${i}"
 					phys_port_args="options:dpdk-devargs=${pci_dev}"
 				else
@@ -1074,8 +1111,8 @@ ovs) #switch configuration
 				ifaces="$ifaces,${phys_port_name}"
 				phy_ifaces="$ifaces,${phys_port_name}"
 
-				#$ovs_bin/ovs-vsctl add-port $phy_br $vhost_port -- set Interface $vhost_port type=dpdkvhostuserclient options:vhost-server-path=/tmp/$vhost_port
-				$ovs_bin/ovs-vsctl add-port $phy_br $vhost_port -- set Interface $vhost_port type=dpdkvhostuserclient options:vhost-server-path=/var/run/openvswitch/$vhost_port
+				$ovs_bin/ovs-vsctl add-port $phy_br $vhost_port -- set Interface $vhost_port type=dpdkvhostuserclient options:vhost-server-path=/tmp/$vhost_port
+				#$ovs_bin/ovs-vsctl add-port $phy_br $vhost_port -- set Interface $vhost_port type=dpdkvhostuserclient options:vhost-server-path=/var/run/openvswitch/$vhost_port
 				ifaces="$ifaces,$vhost_port"
 				vhu_ifaces="$ifaces,$vhost_port"
 
@@ -1095,6 +1132,7 @@ ovs) #switch configuration
 			;;
 		"pp")  # 10GbP1<-->10GbP2
 			# create the bridges/ports with 1 phys dev and 1 virt dev per bridge, to be used for 1 VM to forward packets
+			log "BILL PP"
 			$ovs_bin/ovs-vsctl --if-exists del-br ovsbr0
 			$ovs_bin/ovs-vsctl add-br ovsbr0 -- set bridge ovsbr0 datapath_type=netdev
 			$ovs_bin/ovs-vsctl add-port ovsbr0 ${ovs_dpdk_interface_0_name} -- set Interface ${ovs_dpdk_interface_0_name} type=dpdk ${ovs_dpdk_interface_0_args}
@@ -1131,25 +1169,24 @@ ovs) #switch configuration
 		case $topology in
 		"pp")  # 10GbP1<-->10GbP2
 			vhost_ports=""
+			log "BILL1 PP"
 		esac
+		log "BILL3"
 		echo "devs = $devs"
 		echo "vhost_ports = $vhost_ports"
 		echo "queues = $queues"
-		log "BILL1 pmdcpus = $pmdcpus"
 
 		pmdcpus=`get_pmd_cpus "$devs,$vhost_ports" $queues "ovs-pmd"`
 
-		log "BILL2 pmdcpus = $pmdcpus"
 		if [ -z "$pmdcpus" ]; then
 			exit_error "Could not allocate PMD threads.  Do you have enough isolated cpus in the right NUMA nodes?" ""
-		else
-		        log "BILL2.5 pmdcpus = $pmdcpus"
 		fi
 
 		pmd_cpu_mask=`get_cpumask $pmdcpus`
 
 		#vm_cpus=`sub_from_list $ded_cpus_list $pmdcpus`
 		#log "vm_cpus is [$vm_cpus]"
+		log "BILL pmd_cpu_mask = $pmd_cpu_mask"
 		$ovs_bin/ovs-vsctl set Open_vSwitch . other_config:pmd-cpu-mask=$pmd_cpu_mask
 
 		#if using HT, bind 1 PF and 1 VHU to same core
@@ -1167,12 +1204,8 @@ ovs) #switch configuration
 				while [ ! -z "$cpu_siblings_list" ]; do
 				this_cpu_thread=`echo $cpu_siblings_list | awk -F, '{print $1}'`
 				cpu_siblings_list=`sub_from_list $cpu_siblings_list $this_cpu_thread`
-				echo "iface = $iface"
-				echo "ifaces = $ifaces"
 				iface=`echo $ifaces | awk -F, '{print $1}'`
 				ifaces=`echo $ifaces | sed -e s/^$iface,//`
-				echo "iface = $iface"
-				echo "ifaces = $ifaces"
 				echo "this_cpu_thread = $this_cpu_thread"
 				log "$ovs_bin/ovs-vsctl set Interface $iface other_config:pmd-rxq-affinity=0:$this_cpu_thread"
 				if [ ! -z "$iface" ]; then
