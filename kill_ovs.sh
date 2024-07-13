@@ -1,4 +1,9 @@
 #!/bin/bash
+# using "rpm"
+ovs_bin="/usr/bin"
+ovs_sbin="/usr/sbin"
+ovs_run="/var/run/openvswitch"
+ovs_etc="/etc/openvswitch"
 
 killall -q -w ovs-vswitchd
 killall -q -w ovsdb-server

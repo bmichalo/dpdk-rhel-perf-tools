@@ -1025,7 +1025,7 @@ ovs) #switch configuration
 		# 
 		case $numa_mode in
 		strict)
-			log "Using strict NUMA configuration mode when starting OVS:"
+			log "Using strict NUMA configuration mode when starting OVS: local_numa_nodes = $local_numa_nodes"
 			sudo su -g qemu -c "umask 002; numactl --cpunodebind=$local_numa_nodes $ovs_sbin/ovs-vswitchd $dpdk_opts unix:$DB_SOCK --pidfile --log-file=/var/log/openvswitch/ovs-vswitchd.log --detach"
 			#numactl --cpunodebind=$local_numa_nodes $ovs_sbin/ovs-vswitchd $dpdk_opts unix:$DB_SOCK --pidfile --log-file=/var/log/openvswitch/ovs-vswitchd.log --detach
 			;;
@@ -1135,6 +1135,11 @@ ovs) #switch configuration
 			log "BILL PP"
 			$ovs_bin/ovs-vsctl --if-exists del-br ovsbr0
 			$ovs_bin/ovs-vsctl add-br ovsbr0 -- set bridge ovsbr0 datapath_type=netdev
+			echo "ovs_dpdk_interface_0_name = $ovs_dpdk_interface_0_name"
+			echo "ovs_dpdk_interface_0_args = $ovs_dpdk_interface_0_args"
+			echo "ovs_dpdk_interface_1_name = $ovs_dpdk_interface_1_name"
+			echo "ovs_dpdk_interface_1_args = $ovs_dpdk_interface_1_args"
+
 			$ovs_bin/ovs-vsctl add-port ovsbr0 ${ovs_dpdk_interface_0_name} -- set Interface ${ovs_dpdk_interface_0_name} type=dpdk ${ovs_dpdk_interface_0_args}
 			$ovs_bin/ovs-vsctl add-port ovsbr0 ${ovs_dpdk_interface_1_name} -- set Interface ${ovs_dpdk_interface_1_name} type=dpdk ${ovs_dpdk_interface_1_args}
 			$ovs_bin/ovs-ofctl del-flows ovsbr0
@@ -1142,7 +1147,7 @@ ovs) #switch configuration
 			ovs_ports=2
 			;;
 		esac
-
+                
 		log "using $queues queue(s) per port"
 		$ovs_bin/ovs-vsctl set interface ${ovs_dpdk_interface_0_name} options:n_rxq=$queues
 		$ovs_bin/ovs-vsctl set interface ${ovs_dpdk_interface_1_name} options:n_rxq=$queues
