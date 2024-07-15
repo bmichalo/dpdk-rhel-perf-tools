@@ -242,6 +242,15 @@ vhost_affinity="local"
 no_kill=0
 
 
+#
+# use_ovs_systemd_services:
+#
+# Allow openvswitch.services to set up OVS database and daemon
+# instead of this script doing it
+#
+use_ovs_systemd_services=0
+
+
 function log() {
 	echo -e "start-vswitch: LINENO: ${BASH_LINENO[0]} $1"
 }
@@ -360,7 +369,7 @@ function get_sd_netdev_name() {
 }
 
 # Process options and arguments
-opts=$(getopt -q -o i:c:t:r:m:p:M:S:C:o --longoptions "no-kill,vhost-affinity:,numa-mode:,vm-numa-node:,desc-override:,vhost_devices:,pci-devices:,devices:,nr-queues:,use-ht:,overlay-network:,topology:,dataplane:,switch:,switch-mode:,testpmd-path:,dpdk-nic-kmod:,prefix:,pci-desc-override:,print-config" -n "getopt.sh" -- "$@")
+opts=$(getopt -q -o i:c:t:r:m:p:M:S:C:o --longoptions "no-kill,vhost-affinity:,numa-mode:,vm-numa-node:,desc-override:,vhost_devices:,pci-devices:,devices:,nr-queues:,use-ht:,overlay-network:,topology:,dataplane:,switch:,switch-mode:,testpmd-path:,dpdk-nic-kmod:,prefix:,pci-desc-override:,use-ovs-systemd-services:,sprint-config" -n "getopt.sh" -- "$@")
 if [ $? -ne 0 ]; then
 	printf -- "$*\n"
 	printf "\n"
@@ -402,6 +411,7 @@ if [ $? -ne 0 ]; then
 	printf -- "\t\t                                                   and so the PMD threads for those virt devices are also on\n"
 	printf -- "\t\t                                                   another NUMA node.\n"
         printf -- "\t\t--vm-numa-node ........................ Number representing which NUMA node the VM exists.  To be used with 'numa-mode=cross'\n"
+        printf -- "\t\t--use-ovs-systemd-services .............Use openvswitch systemd services to start OVS\n"
 	exit_error "" ""
 fi
 pci_descriptor_override=""
@@ -552,6 +562,14 @@ while true; do
 			log "prefix: [$prefix]"
 		fi
 		;;
+		--use-ovs-systemd-services)
+		shift
+		if [ -n "$1" ]; then
+			use_ovs_systemd_services="$1"
+			shift
+			log "use_ovs_systemd_services: [$use_ovs_systemd_services]"
+		fi
+		;;
 		--print-config)
 		shift
 		echo ""
@@ -573,6 +591,7 @@ while true; do
 		echo "cpu_usage_file = $cpu_usage_file"
 		echo "vhost_affinity = $vhost_affinity"
 		echo "no_kill = $no_kill"
+		echo "use_ovs_systemd_services=$use_ovs_systemd_services"
 		echo ""
 		;;
 		--)
@@ -883,27 +902,31 @@ linuxbridge) #switch configuration
 	esac
 	;;
 ovs) #switch configuration
-	DB_SOCK="$ovs_run/db.sock"
 	ovs_ver=`$ovs_sbin/ovs-vswitchd --version | awk '{print $4}'`
-	log "starting ovs (ovs_ver=${ovs_ver})"
-	mkdir -p $ovs_run
-	mkdir -p $ovs_etc
-	log "Initializing the OVS configuration database at $ovs_etc/conf.db using 'ovsdb-tool create'..."
-	$ovs_bin/ovsdb-tool create $ovs_etc/conf.db /usr/share/openvswitch/vswitch.ovsschema
-	log "Starting the OVS configuration database process ovsdb-server and connecting to Unix socket $DB_SOCK..." 
-	$ovs_sbin/ovsdb-server -v --remote=punix:$DB_SOCK \
-	--remote=db:Open_vSwitch,Open_vSwitch,manager_options \
-	--pidfile --detach || exit_error "failed to start ovsdb" ""
-	/bin/rm -f /var/log/openvswitch/ovs-vswitchd.log
+        if [ $use_ovs_systemd_services -eq 0 ]; then
+		DB_SOCK="$ovs_run/db.sock"
+		log "starting ovs (ovs_ver=${ovs_ver})"
+		mkdir -p $ovs_run
+		mkdir -p $ovs_etc
+		log "Initializing the OVS configuration database at $ovs_etc/conf.db using 'ovsdb-tool create'..."
+		$ovs_bin/ovsdb-tool create $ovs_etc/conf.db /usr/share/openvswitch/vswitch.ovsschema
+		log "Starting the OVS configuration database process ovsdb-server and connecting to Unix socket $DB_SOCK..." 
+		$ovs_sbin/ovsdb-server -v --remote=punix:$DB_SOCK \
+		--remote=db:Open_vSwitch,Open_vSwitch,manager_options \
+		--pidfile --detach || exit_error "failed to start ovsdb" ""
+		/bin/rm -f /var/log/openvswitch/ovs-vswitchd.log
 
-	log "Now intialize the OVS database using 'ovs-vsctl --no-wait init' ..."
-	$ovs_bin/ovs-vsctl --no-wait init
-
-	log "starting ovs-vswitchd"
+		log "Now intialize the OVS database using 'ovs-vsctl --no-wait init' ..."
+		$ovs_bin/ovs-vsctl --no-wait init
+		log "starting ovs-vswitchd"
+	else
+		log "Using systemd services to initialize OVS database and server daemon"
+	fi
 	case $dataplane in
 	"dpdk")
 		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3"; then
 			dpdk_opts=""
+			log "BILL init DPDK"
 			#
 			# Specify OVS should support DPDK ports
 			#
@@ -1023,21 +1046,23 @@ ovs) #switch configuration
 		# 
 		# and therefore allow the VM to start successfully
 		# 
-		case $numa_mode in
-		strict)
-			log "Using strict NUMA configuration mode when starting OVS: local_numa_nodes = $local_numa_nodes"
-			sudo su -g qemu -c "umask 002; numactl --cpunodebind=$local_numa_nodes $ovs_sbin/ovs-vswitchd $dpdk_opts unix:$DB_SOCK --pidfile --log-file=/var/log/openvswitch/ovs-vswitchd.log --detach"
-			#numactl --cpunodebind=$local_numa_nodes $ovs_sbin/ovs-vswitchd $dpdk_opts unix:$DB_SOCK --pidfile --log-file=/var/log/openvswitch/ovs-vswitchd.log --detach
-			;;
-		preferred)
-			log "Using preferred NUMA configuration mode when starting OVS:"
-			#log "BILL - dpdk_opts = $dpdk_opts"
-			#log "BILL - DB_SOCK = $DB_SOCK"
-			#sleep 5
-			#exit
-			sudo su -g qemu -c "umask 002; $ovs_sbin/ovs-vswitchd $dpdk_opts unix:$DB_SOCK --pidfile --log-file=/var/log/openvswitch/ovs-vswitchd.log --detach"
-			;;
-		esac
+        	if [ $use_ovs_systemd_services -eq 0 ]; then
+			case $numa_mode in
+			strict)
+				log "Using strict NUMA configuration mode when starting OVS: local_numa_nodes = $local_numa_nodes"
+				sudo su -g qemu -c "umask 002; numactl --cpunodebind=$local_numa_nodes $ovs_sbin/ovs-vswitchd $dpdk_opts unix:$DB_SOCK --pidfile --log-file=/var/log/openvswitch/ovs-vswitchd.log --detach"
+				#numactl --cpunodebind=$local_numa_nodes $ovs_sbin/ovs-vswitchd $dpdk_opts unix:$DB_SOCK --pidfile --log-file=/var/log/openvswitch/ovs-vswitchd.log --detach
+				;;
+			preferred)
+				log "Using preferred NUMA configuration mode when starting OVS:"
+				#log "BILL - dpdk_opts = $dpdk_opts"
+				#log "BILL - DB_SOCK = $DB_SOCK"
+				#sleep 5
+				#exit
+				sudo su -g qemu -c "umask 002; $ovs_sbin/ovs-vswitchd $dpdk_opts unix:$DB_SOCK --pidfile --log-file=/var/log/openvswitch/ovs-vswitchd.log --detach"
+				;;
+			esac
+		fi
 
 		rc=$?
 		;;

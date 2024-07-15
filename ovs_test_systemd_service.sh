@@ -9,6 +9,7 @@ ovs_etc="/etc/openvswitch"
 
 $ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-init=true
 $ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:vhost-iommu-support=true
+$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-socket-mem="0,0,1024,0,0,0,0,0"
 
 
 
