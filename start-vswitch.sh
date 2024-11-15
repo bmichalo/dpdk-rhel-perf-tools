@@ -924,7 +924,7 @@ ovs) #switch configuration
 	fi
 	case $dataplane in
 	"dpdk")
-		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3"; then
+		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3\|^3\.4"; then
 			dpdk_opts=""
 			log "BILL init DPDK"
 			#
@@ -939,8 +939,8 @@ ovs) #switch configuration
 			# 
 			$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:vhost-iommu-support=true
 
-			#log "Local NUMA node non-isolated CPUs list: $local_nodes_non_iso_cpus_list"
-			#log "OVS setting other_config:dpdk-lcore-mask = `get_cpumask $local_nodes_non_iso_cpus_list`"
+			log "BILL - Local NUMA node non-isolated CPUs list: $local_nodes_non_iso_cpus_list"
+			log "BILL - OVS setting other_config:dpdk-lcore-mask = `get_cpumask $local_nodes_non_iso_cpus_list`"
 
 			#
 			# Note both dpdk-socket-mem and dpdk-lcore-mask should be set before dpdk-init is set to 
@@ -956,11 +956,13 @@ ovs) #switch configuration
 				log "NUMA setting is strict"
 				log "OVS setting other_config:dpdk-socket-mem = $local_socket_mem_opt"
 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-socket-mem="$local_socket_mem_opt"
+				#$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask=0x1000000010000000100000001
 				#$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask="`get_cpumask $local_nodes_non_iso_cpus_list`"
 				;;
 			preferred)
 				log "NUMA setting is perferred"
 				$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-socket-mem="$all_socket_mem_opt"
+				#$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask=0x1000000010000000100000001
 				#$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-lcore-mask=$mask_all_nodes_non_iso_cpus_list
 				#$ovs_bin/ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-extra="--lcores 0@32,1@160,2@33,4@161"
 				;;
@@ -1076,7 +1078,7 @@ ovs) #switch configuration
 	$ovs_bin/ovs-vsctl --no-wait init
 
 	if [ "$dataplane" == "dpdk" ]; then
-		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3"; then
+		if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3\|^3\.4"; then
 			pci_devs=`get_devs_locs $devs`
 
 			ovs_dpdk_interface_0_name="dpdk-0"
@@ -1122,7 +1124,7 @@ ovs) #switch configuration
 				log "vhost_port: $vhost_port"
 				vhost_ports="$vhost_ports,$vhost_port"
 
-		        if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3"; then
+		        if echo $ovs_ver | grep -q "^2\.6\|^2\.7\|^2\.8\|^2\.9\|^2\.10\|^2\.11\|^2\.12\|^2\.13\|^2\.14\|^2\.15\|^2\.16\|^2\.17\|^3\.2\.3\|^3\.3\|^3\.4"; then
 					phys_port_name="dpdk-${i}"
 					phys_port_args="options:dpdk-devargs=${pci_dev}"
 				else
